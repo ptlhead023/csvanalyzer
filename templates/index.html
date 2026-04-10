@@ -14,6 +14,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     const firebaseConfig = {
       apiKey: "AIzaSyA55BabUj8ib6sF47M7eYjd0pngou6nsls",
       authDomain: "tabloanalizbeta.firebaseapp.com",
@@ -25,7 +26,10 @@
     };
     const fbApp = initializeApp(firebaseConfig);
     const db = getFirestore(fbApp);
+    const fbAuth = getAuth(fbApp);
+    window.__fbApp = fbApp;
     window.__db = db;
+    window.__fbAuth = fbAuth;
     window.__fbReady = true;
     document.dispatchEvent(new Event("firebase-ready"));
   </script>
@@ -44,15 +48,20 @@
       <button class="nav-item" data-tab="new-analysis"><i data-lucide="plus-circle"></i><span>Yeni Analiz</span></button>
       <button class="nav-item" data-tab="results"><i data-lucide="bar-chart-2"></i><span>Sonuçlar</span><span class="nav-badge" id="results-badge" style="display:none">!</span></button>
       <button class="nav-item" data-tab="settings"><i data-lucide="settings-2"></i><span>Ayarlar</span></button>
+      <button class="nav-item admin-only" data-tab="admin" id="nav-admin" style="display:none"><i data-lucide="shield"></i><span>Admin</span></button>
     </nav>
     <div class="sidebar-bottom">
       <div class="server-status" id="server-status">
         <span class="status-dot" id="status-dot"></span>
         <span class="status-label" id="status-label">Bağlanıyor...</span>
       </div>
-      <div class="firebase-status" id="firebase-status">
-        <i data-lucide="cloud"></i>
-        <span id="firebase-label">Firebase</span>
+      <div class="user-profile-mini" id="user-profile-mini" style="display:none">
+        <img class="user-avatar-mini" id="user-avatar-mini" src="" alt="" />
+        <div class="user-info-mini">
+          <span class="user-name-mini" id="user-name-mini"></span>
+          <span class="user-email-mini" id="user-email-mini"></span>
+        </div>
+        <button class="icon-btn icon-btn-xs" id="btn-sign-out" title="Çıkış Yap"><i data-lucide="log-out"></i></button>
       </div>
     </div>
   </aside>
@@ -352,41 +361,22 @@
 
         <!-- AI API Yönetimi -->
         <div class="settings-card settings-card-wide" id="api-section">
-          <h3><i data-lucide="bot"></i> AI API Bağlantıları</h3>
-          <p class="settings-hint">Birden çok API ekleyebilirsiniz. Kota dolunca otomatik diğerine geçilir. İstekler sırayla dağıtılır.</p>
-
-          <div id="api-manager-container" class="api-manager-container"></div>
-
-          <div class="api-manager-footer">
-            <button class="btn-secondary" id="btn-open-add-api"><i data-lucide="plus"></i> Yeni API Ekle</button>
-            <button class="btn-text" id="btn-reset-all-quotas"><i data-lucide="refresh-cw"></i> Tüm Kotaları Sıfırla</button>
+          <div class="settings-card-header">
+            <div>
+              <h3><i data-lucide="bot"></i> AI API Bağlantıları</h3>
+              <p class="settings-hint">Birden çok API ekleyebilirsiniz. Kota dolunca otomatik diğerine geçilir.</p>
+            </div>
+            <button class="btn-primary" id="btn-open-add-api-modal"><i data-lucide="plus"></i> Yeni Bağlantı</button>
           </div>
-
-          <div id="add-api-form" style="display:none" class="add-api-form">
-            <div class="form-row">
-              <label>API Sağlayıcı</label>
-              <select id="new-api-provider" class="param-select">
-                <option value="gemini">Google Gemini</option>
-                <option value="openai">OpenAI</option>
-              </select>
+          <div id="api-manager-container" class="api-manager-container">
+            <div class="api-empty-state" id="api-empty-state">
+              <i data-lucide="bot"></i>
+              <p>Henüz API bağlantısı yok</p>
+              <small>Gemini Flash ile ücretsiz başlayın</small>
             </div>
-            <div class="form-row">
-              <label>Model Seç</label>
-              <select id="new-api-model" class="param-select"></select>
-            </div>
-            <div class="form-row">
-              <label>API Anahtarı</label>
-              <input type="password" id="new-api-key" placeholder="API anahtarını girin..." />
-            </div>
-            <div class="form-row">
-              <label>İsim (opsiyonel)</label>
-              <input type="text" id="new-api-name" placeholder="Örn: Kişisel Gemini" />
-            </div>
-            <div class="add-api-actions">
-              <button class="btn-secondary" id="btn-test-add-api"><i data-lucide="plug"></i> Test Et</button>
-              <button class="btn-primary" id="btn-save-add-api"><i data-lucide="save"></i> Kaydet</button>
-            </div>
-            <div id="add-api-status" class="api-status"></div>
+          </div>
+          <div class="api-manager-footer" id="api-manager-footer" style="display:none">
+            <button class="btn-text" id="btn-reset-all-quotas"><i data-lucide="refresh-cw"></i> Tüm Kotaları Sıfırla</button>
           </div>
         </div>
 
@@ -422,6 +412,19 @@
           <button class="btn-secondary" id="btn-test-server"><i data-lucide="activity"></i> Sunucuyu Test Et</button>
         </div>
 
+        <!-- Paket & Abonelik -->
+        <div class="settings-card settings-card-wide" id="plan-section">
+          <div class="settings-card-header">
+            <div>
+              <h3><i data-lucide="package"></i> Paket &amp; Abonelik</h3>
+              <p class="settings-hint">Mevcut planınız, kullanım istatistikleri ve yükseltme seçenekleri.</p>
+            </div>
+          </div>
+          <div id="user-plan-section">
+            <div class="loading-spinner-sm"></div>
+          </div>
+        </div>
+
         <!-- Veri Yönetimi -->
         <div class="settings-card">
           <h3><i data-lucide="trash-2"></i> Veri Yönetimi</h3>
@@ -431,6 +434,49 @@
           </div>
         </div>
 
+      </div>
+    </section>
+
+    <!-- ══ ADMIN PANEL ══ -->
+    <section class="tab-panel" id="tab-admin">
+      <div class="admin-tabs">
+        <button class="admin-tab-btn active" data-admin-tab="dashboard"><i data-lucide="layout-dashboard"></i> Dashboard</button>
+        <button class="admin-tab-btn" data-admin-tab="users"><i data-lucide="users"></i> Kullanıcılar</button>
+        <button class="admin-tab-btn" data-admin-tab="apis"><i data-lucide="key"></i> API'ler</button>
+        <button class="admin-tab-btn" data-admin-tab="economy"><i data-lucide="trending-up"></i> Ekonomi</button>
+        <button class="admin-tab-btn" data-admin-tab="plans"><i data-lucide="package"></i> Paketler</button>
+        <button class="admin-tab-btn" data-admin-tab="bulk"><i data-lucide="users-round"></i> Toplu Atama</button>
+        <button class="admin-tab-btn" data-admin-tab="security"><i data-lucide="shield-check"></i> Güvenlik</button>
+      </div>
+
+      <div class="admin-content">
+        <div class="admin-tab-panel active" id="admin-tab-dashboard">
+          <div id="admin-dashboard"></div>
+        </div>
+
+        <div class="admin-tab-panel" id="admin-tab-users">
+          <div id="admin-users-list"></div>
+        </div>
+
+        <div class="admin-tab-panel" id="admin-tab-apis">
+          <div id="admin-apis-list"></div>
+        </div>
+
+        <div class="admin-tab-panel" id="admin-tab-economy">
+          <div id="admin-economy-container"></div>
+        </div>
+
+        <div class="admin-tab-panel" id="admin-tab-plans">
+          <div id="admin-plan-editor-container"></div>
+        </div>
+
+        <div class="admin-tab-panel" id="admin-tab-bulk">
+          <div id="admin-bulk-assign-container"></div>
+        </div>
+
+        <div class="admin-tab-panel" id="admin-tab-security">
+          <div id="admin-security-container"></div>
+        </div>
       </div>
     </section>
 
@@ -444,6 +490,139 @@
     <div class="loading-inner">
       <div class="loading-spinner"></div>
       <p id="loading-text">İşleniyor...</p>
+    </div>
+  </div>
+
+
+  <!-- ══ AUTH SCREEN ══ -->
+  <div class="auth-screen" id="auth-screen">
+    <div class="auth-backdrop"></div>
+    <div class="auth-card">
+      <div class="auth-logo">
+        <span class="auth-logo-icon">◈</span>
+        <span class="auth-logo-text">DataLens</span>
+      </div>
+      <div class="auth-tagline">Veri analizi için AI destekli platform</div>
+      <div class="auth-features">
+        <div class="auth-feature"><i data-lucide="brain"></i><span>AI Destekli Analiz</span></div>
+        <div class="auth-feature"><i data-lucide="shield"></i><span>Güvenli Depolama</span></div>
+        <div class="auth-feature"><i data-lucide="zap"></i><span>Anlık Tahminler</span></div>
+      </div>
+      <button class="btn-google-signin" id="btn-google-signin">
+        <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.34-8.16 2.34-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Google ile Giriş Yap
+      </button>
+      <p class="auth-disclaimer">Giriş yaparak verilerinizi güvenle bulutla senkronize edebilirsiniz</p>
+      <div class="auth-error" id="auth-error" style="display:none"></div>
+      <div class="auth-loading" id="auth-loading" style="display:none">
+        <div class="auth-spinner"></div>
+        <span>Giriş yapılıyor...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ KOTA DOLDU MODAL — YENİDEN TASARLANMIŞ ══ -->
+  <div class="modal-overlay quota-modal-overlay" id="quota-exhausted-modal" style="display:none">
+    <div class="modal quota-modal">
+      <div class="quota-modal-top">
+        <div class="quota-icon-wrap">
+          <i data-lucide="battery-low"></i>
+        </div>
+        <h2>API Kotası Doldu</h2>
+        <p>Tüm API bağlantılarınızın günlük kotası tükendi. İşleminize devam etmek için bir seçenek belirleyin.</p>
+      </div>
+      <div class="quota-api-list" id="quota-api-list"></div>
+      <div class="quota-actions">
+        <div class="quota-action-row">
+          <button class="btn-quota-option" id="btn-quota-add-new">
+            <i data-lucide="plus-circle"></i>
+            <div>
+              <strong>Yeni API Ekle</strong>
+              <span>Farklı bir hesaptan API anahtarı ekle</span>
+            </div>
+          </button>
+          <button class="btn-quota-option" id="btn-quota-reset-all">
+            <i data-lucide="refresh-cw"></i>
+            <div>
+              <strong>Tüm Kotaları Sıfırla</strong>
+              <span>Sadece limit takibini sıfırlar (API'ler hâlâ doluysa hata alırsın)</span>
+            </div>
+          </button>
+        </div>
+        <button class="btn-secondary quota-dismiss" id="btn-quota-dismiss">Şimdi Değil</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ API EKLE MODAL — GEMİNİ AKIŞI ══ -->
+  <div class="modal-overlay" id="add-api-modal" style="display:none">
+    <div class="modal modal-add-api">
+      <div class="modal-header">
+        <h3><i data-lucide="key"></i> Yeni API Bağlantısı</h3>
+        <button class="icon-btn" id="btn-close-add-api-modal"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="add-api-steps">
+
+          <!-- Adım 1: Sağlayıcı & Key -->
+          <div class="api-step" id="api-step-1">
+            <div class="api-step-label"><span class="step-num">1</span> Sağlayıcı ve Anahtar</div>
+            <div class="form-row">
+              <label>API Sağlayıcı</label>
+              <div class="provider-tabs" id="provider-tabs">
+                <button class="provider-tab active" data-provider="gemini">
+                  <span class="provider-logo">G</span> Google Gemini
+                  <span class="provider-badge free">Ücretsiz Plan Var</span>
+                </button>
+                <button class="provider-tab" data-provider="openai">
+                  <span class="provider-logo">⊕</span> OpenAI
+                  <span class="provider-badge paid">Ücretli</span>
+                </button>
+              </div>
+            </div>
+            <div class="form-row">
+              <label>API Anahtarı</label>
+              <div class="api-key-input-wrap">
+                <input type="password" id="modal-api-key" placeholder="API anahtarınızı girin..." autocomplete="off" />
+                <button class="icon-btn" id="btn-toggle-key-visibility" type="button"><i data-lucide="eye"></i></button>
+              </div>
+              <a class="api-key-help" id="api-key-help-link" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">
+                <i data-lucide="external-link"></i> Gemini API anahtarı nasıl alınır?
+              </a>
+            </div>
+            <div class="form-row" id="modal-fetch-models-row">
+              <button class="btn-primary btn-fetch-models" id="btn-fetch-models">
+                <i data-lucide="download-cloud"></i> Modelleri Çek
+              </button>
+              <span class="fetch-hint">API anahtarına ait aktif modelleri listeler</span>
+            </div>
+            <div class="api-step-status" id="modal-step1-status"></div>
+          </div>
+
+          <!-- Adım 2: Model Seç -->
+          <div class="api-step api-step-locked" id="api-step-2">
+            <div class="api-step-label"><span class="step-num">2</span> Model Seç</div>
+            <div class="model-grid" id="modal-model-grid">
+              <div class="model-grid-empty">← Önce API anahtarı girin ve "Modelleri Çek"e tıklayın</div>
+            </div>
+          </div>
+
+          <!-- Adım 3: İsim & Test -->
+          <div class="api-step api-step-locked" id="api-step-3">
+            <div class="api-step-label"><span class="step-num">3</span> Bağlantıyı Onayla</div>
+            <div class="form-row">
+              <label>Bağlantı Adı <span class="form-hint">(opsiyonel)</span></label>
+              <input type="text" id="modal-api-name" placeholder="Örn: Kişisel Gemini Flash" maxlength="50" />
+            </div>
+            <div class="test-result" id="modal-test-result" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btn-cancel-add-api">İptal</button>
+        <button class="btn-secondary" id="btn-test-modal-api" disabled><i data-lucide="plug"></i> Bağlantıyı Test Et</button>
+        <button class="btn-primary" id="btn-save-modal-api" disabled><i data-lucide="save"></i> Kaydet ve Aktifleştir</button>
+      </div>
     </div>
   </div>
 
@@ -517,66 +696,21 @@
     </div>
   </div>
 
-  <!-- API Kurulum Modal (API yokken) -->
-  <div class="modal-overlay" id="api-setup-modal" style="display:none">
-    <div class="modal">
-      <div class="modal-header">
-        <h3><i data-lucide="bot"></i> AI için API Gerekli</h3>
-        <button class="icon-btn" id="btn-close-api-setup"><i data-lucide="x"></i></button>
-      </div>
-      <div class="modal-body">
-        <p class="modal-desc">AI özelliklerini kullanmak için en az bir API anahtarı ekleyin. Gemini ücretsiz model önerilir.</p>
-        <div class="form-row">
-          <label>API Sağlayıcı</label>
-          <select id="new-api-provider" class="param-select" disabled>
-            <option value="gemini">Google Gemini</option>
-            <option value="openai">OpenAI</option>
-          </select>
-        </div>
-        <div class="form-row">
-          <label>Model</label>
-          <select id="new-api-model" class="param-select" disabled>
-            <option value="gemini-2.0-flash">Gemini 2.0 Flash ★ Ücretsiz</option>
-          </select>
-        </div>
-        <div class="form-row">
-          <label>API Anahtarı</label>
-          <input type="password" id="new-api-key" placeholder="Gemini API anahtarını girin..." />
-        </div>
-        <div class="form-row">
-          <label>İsim</label>
-          <input type="text" id="new-api-name" placeholder="Örn: Kişisel Gemini" />
-        </div>
-        <div id="add-api-status" class="api-status"></div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-secondary" id="btn-close-api-setup">Şimdi Değil</button>
-        <button class="btn-secondary" id="btn-test-add-api"><i data-lucide="plug"></i> Test Et</button>
-        <button class="btn-primary" id="btn-save-add-api"><i data-lucide="save"></i> Kaydet ve Devam Et</button>
-      </div>
-    </div>
+  <!-- Admin Modal -->
+  <div class="modal-overlay" id="admin-modal" style="display:none">
   </div>
 
-  <!-- Kota Doldu Modal -->
-  <div class="modal-overlay" id="quota-exhausted-modal" style="display:none">
-    <div class="modal">
-      <div class="modal-header">
-        <h3><i data-lucide="alert-triangle"></i> Tüm API Kotaları Doldu</h3>
-        <button class="icon-btn" id="btn-close-quota-modal"><i data-lucide="x"></i></button>
-      </div>
-      <div class="modal-body">
-        <p class="modal-desc">Tüm API'lerinizin kotası doldu. Yeni API ekleyebilir veya mevcut kotaları sıfırlayabilirsiniz.</p>
-        <div id="quota-api-list"></div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-secondary" onclick="TabManager.switchTo('settings');document.getElementById('quota-exhausted-modal').style.display='none'">Ayarlara Git</button>
-        <button class="btn-primary" onclick="AIManager.resetAllQuotas();AIRender.closeQuotaModal();App.toast('Kotalar sıfırlandı','success')">Tümünü Sıfırla</button>
-      </div>
-    </div>
-  </div>
+
+
 
   <!-- Scripts -->
   <script src="/static/js/firebase.js"></script>
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/admin.js"></script>
+  <script src="/static/js/admin_ui.js"></script>
+  <script src="/static/js/plans.js"></script>
+  <script src="/static/js/pricing_ui.js"></script>
+  <script src="/static/js/admin_economy.js"></script>
   <script src="/static/js/bridge.js"></script>
   <script src="/static/js/editor.js"></script>
   <script src="/static/js/charts.js"></script>

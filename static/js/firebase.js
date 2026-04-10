@@ -1,63 +1,66 @@
+// ══════════════════════════════════════════════════════════
+//  firebase.js  —  Firestore project CRUD (user-scoped)
+// ══════════════════════════════════════════════════════════
 const FirebaseDB = (() => {
-  function getDB() {
-    return window.__db || null;
+  const FIREBASE_CDN = 'https://www.gstatic.com/firebasejs/10.12.2';
+
+  async function _getFS() {
+    return import(`${FIREBASE_CDN}/firebase-firestore.js`);
   }
 
-  function waitForFirebase(timeout = 5000) {
-    return new Promise((resolve, reject) => {
-      if (window.__fbReady && window.__db) { resolve(window.__db); return; }
-      const timer = setTimeout(() => reject(new Error('Firebase bağlantı zaman aşımı')), timeout);
-      document.addEventListener('firebase-ready', () => {
-        clearTimeout(timer);
-        resolve(window.__db);
-      }, { once: true });
-    });
+  function _getDB() {
+    if (!window.__fbApp) throw new Error('Firebase başlatılmamış');
+    return null; // getFirestore called inline
+  }
+
+  async function _projectsCol() {
+    const fs  = await _getFS();
+    const { getFirestore, collection } = fs;
+    const uid = Auth.getUID();
+    if (!uid) throw new Error('Giriş yapılmamış');
+    const db = getFirestore(window.__fbApp);
+    return { fs, db, col: collection(db, 'users', uid, 'projects'), uid };
   }
 
   async function saveProject(projectData) {
-    const { addDoc, setDoc, doc, collection, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-    const db = await waitForFirebase();
+    const { fs, db, col, uid } = await _projectsCol();
+    const { addDoc, setDoc, doc, serverTimestamp } = fs;
     const now = serverTimestamp();
-
     if (projectData.id) {
-      const ref = doc(db, 'projects', projectData.id);
+      const ref = doc(db, 'users', uid, 'projects', projectData.id);
       await setDoc(ref, { ...projectData, updatedAt: now }, { merge: true });
       return projectData.id;
     } else {
-      const ref = await addDoc(collection(db, 'projects'), {
-        ...projectData,
-        createdAt: now,
-        updatedAt: now
-      });
+      const ref = await addDoc(col, { ...projectData, createdAt: now, updatedAt: now });
       return ref.id;
     }
   }
 
   async function loadProject(id) {
-    const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-    const db = await waitForFirebase();
-    const snap = await getDoc(doc(db, 'projects', id));
+    const { fs, db, uid } = await _projectsCol();
+    const { doc, getDoc } = fs;
+    const snap = await getDoc(doc(db, 'users', uid, 'projects', id));
     if (!snap.exists()) throw new Error('Proje bulunamadı');
     return { id: snap.id, ...snap.data() };
   }
 
   async function listProjects() {
-    const { collection, getDocs, orderBy, query } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-    const db = await waitForFirebase();
-    const q = query(collection(db, 'projects'), orderBy('updatedAt', 'desc'));
+    const { fs, col } = await _projectsCol();
+    const { getDocs, orderBy, query } = fs;
+    const q    = query(col, orderBy('updatedAt', 'desc'));
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
   }
 
   async function deleteProject(id) {
-    const { doc, deleteDoc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-    const db = await waitForFirebase();
-    await deleteDoc(doc(db, 'projects', id));
+    const { fs, db, uid } = await _projectsCol();
+    const { doc, deleteDoc } = fs;
+    await deleteDoc(doc(db, 'users', uid, 'projects', id));
   }
 
   async function createShareLink(projectId) {
-    const { addDoc, collection, serverTimestamp, Timestamp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-    const db = await waitForFirebase();
+    const { fs, db } = await _projectsCol();
+    const { collection, addDoc, serverTimestamp, Timestamp } = fs;
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
     const ref = await addDoc(collection(db, 'shared'), {
@@ -70,25 +73,24 @@ const FirebaseDB = (() => {
   }
 
   async function loadShared(shareId) {
-    const { doc, getDoc, Timestamp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-    const db = await waitForFirebase();
-    const shareSnap = await getDoc(doc(db, 'shared', shareId));
-    if (!shareSnap.exists()) throw new Error('Paylaşım linki geçersiz');
-    const shareData = shareSnap.data();
-    if (shareData.expiresAt && shareData.expiresAt.toDate() < new Date()) {
-      throw new Error('Paylaşım linki süresi dolmuş');
-    }
+    const fs = await _getFS();
+    const { getFirestore, doc, getDoc } = fs;
+    const db   = getFirestore(window.__fbApp);
+    const snap = await getDoc(doc(db, 'shared', shareId));
+    if (!snap.exists()) throw new Error('Paylaşım linki geçersiz');
+    const shareData = snap.data();
+    if (shareData.expiresAt?.toDate() < new Date()) throw new Error('Paylaşım linki süresi dolmuş');
     return loadProject(shareData.projectId);
   }
 
   async function testConnection() {
     try {
-      await waitForFirebase(4000);
+      if (!window.__fbApp) return { ok: false, error: 'Firebase başlatılmamış' };
       return { ok: true };
     } catch (e) {
       return { ok: false, error: e.message };
     }
   }
 
-  return { saveProject, loadProject, listProjects, deleteProject, createShareLink, loadShared, testConnection, getDB };
+  return { saveProject, loadProject, listProjects, deleteProject, createShareLink, loadShared, testConnection };
 })();
