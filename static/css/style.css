@@ -3807,3 +3807,225 @@ body {
   border-bottom: 1px solid var(--border);
   margin-bottom: 1rem;
 }
+
+/* ══════════════════════════════════════════════════════════
+   AI MANAGER v2 — Free banner, retry, chat enhancements
+   Sütun Rol Seçici
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Free Plan Banner ──────────────────────────────────── */
+.ai-free-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .6rem 1rem;
+  background: color-mix(in srgb, #3b82f6 10%, var(--bg-card));
+  border: 1px solid #3b82f680;
+  border-radius: 10px;
+  margin-bottom: .75rem;
+  flex-wrap: wrap;
+  animation: slideDown .25s ease;
+}
+.ai-free-banner.warn {
+  background: color-mix(in srgb, #f59e0b 10%, var(--bg-card));
+  border-color: #f59e0b80;
+}
+.ai-free-banner.full {
+  background: color-mix(in srgb, #ef4444 10%, var(--bg-card));
+  border-color: #ef444480;
+}
+.ai-banner-left { display: flex; align-items: center; gap: .6rem; }
+.ai-banner-icon { font-size: 1.1rem; }
+.ai-banner-text { display: flex; flex-direction: column; gap: .1rem; }
+.ai-banner-title { font-size: .82rem; font-weight: 700; color: var(--text-primary); }
+.ai-banner-sub   { font-size: .75rem; color: var(--text-muted); }
+.ai-banner-right { display: flex; align-items: center; gap: .75rem; }
+.ai-banner-bar-wrap {
+  width: 80px; height: 5px;
+  background: var(--bg-hover);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.ai-banner-bar { height: 100%; border-radius: 3px; transition: width .4s; }
+.ai-banner-upgrade {
+  font-size: .75rem; font-weight: 700;
+  padding: .25rem .7rem;
+  background: var(--accent);
+  color: #fff;
+  border: none; border-radius: 6px; cursor: pointer;
+  white-space: nowrap;
+}
+.ai-banner-upgrade:hover { opacity: .85; }
+
+/* ── Retry countdown banner ────────────────────────────── */
+.ai-retry-banner {
+  background: color-mix(in srgb, #f59e0b 12%, var(--bg-hover));
+  border: 1px solid #f59e0b60;
+  border-radius: 8px;
+  padding: .5rem .85rem;
+  font-size: .8rem;
+  color: #f59e0b;
+  margin: .4rem 0;
+}
+
+/* ── Chat panel header ─────────────────────────────────── */
+.ai-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: .75rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: .75rem;
+}
+.ai-panel-header h3 { display: flex; align-items: center; gap: .5rem; margin: 0; font-size: .95rem; }
+.ai-panel-header-right { display: flex; align-items: center; gap: .5rem; }
+.ai-header-btn {
+  background: transparent; border: none;
+  color: var(--text-muted); cursor: pointer;
+  padding: .25rem; border-radius: 6px;
+  transition: all .15s;
+}
+.ai-header-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
+
+/* ── Quick action buttons inside chat ──────────────────── */
+.ai-quick-actions {
+  display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .6rem;
+}
+.ai-quick-btn {
+  font-size: .75rem; padding: .25rem .65rem;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 6px; cursor: pointer; color: var(--text-secondary);
+  transition: all .15s;
+}
+.ai-quick-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Attach strip ──────────────────────────────────────── */
+.ai-chat-attach-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .35rem .75rem;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 1px solid var(--accent)50;
+  border-radius: 8px;
+  margin-bottom: .4rem;
+  font-size: .78rem;
+}
+.attach-badge { display: flex; align-items: center; gap: .4rem; color: var(--accent); font-weight: 600; }
+.attach-remove {
+  background: transparent; border: none; cursor: pointer;
+  color: var(--text-muted); font-size: .85rem; padding: 0 .2rem;
+}
+.attach-remove:hover { color: #ef4444; }
+
+/* ── Chat input area ───────────────────────────────────── */
+.ai-chat-input-area {
+  display: flex; align-items: flex-end; gap: .4rem;
+  padding: .6rem;
+  background: var(--bg-hover);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.btn-chat-attach {
+  background: transparent; border: none; cursor: pointer;
+  color: var(--text-muted); padding: .3rem; border-radius: 6px;
+  flex-shrink: 0; transition: all .15s;
+}
+.btn-chat-attach:hover, .btn-chat-attach.active { color: var(--accent); }
+
+/* ── Markdown in chat bubbles ──────────────────────────── */
+.ai-msg-bubble .ai-code-block {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .6rem .85rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .78rem;
+  overflow-x: auto;
+  margin: .5rem 0;
+  white-space: pre;
+}
+.ai-msg-bubble .ai-inline-code {
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: .1rem .35rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .8em;
+}
+.ai-msg-bubble .ai-list { margin: .4rem 0; padding-left: 1.2rem; }
+.ai-msg-bubble .ai-list li { margin-bottom: .2rem; font-size: .85rem; }
+.ai-msg-bubble .ai-h2 { font-size: 1rem; font-weight: 700; margin: .6rem 0 .3rem; }
+.ai-msg-bubble .ai-h3 { font-size: .9rem; font-weight: 700; margin: .5rem 0 .25rem; }
+.ai-msg-bubble .ai-h4 { font-size: .85rem; font-weight: 600; margin: .4rem 0 .2rem; color: var(--text-secondary); }
+
+/* ── Sütun Rol Seçici ───────────────────────────────────── */
+.col-role-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+.col-role-header { margin-bottom: .85rem; }
+.col-role-header h3 {
+  display: flex; align-items: center; gap: .5rem;
+  margin: 0 0 .25rem; font-size: .95rem;
+}
+.col-role-hint { font-size: .78rem; color: var(--text-muted); }
+.col-role-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: .75rem;
+  margin-bottom: .75rem;
+}
+.col-role-card {
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: .6rem .75rem;
+  display: flex;
+  flex-direction: column;
+  gap: .45rem;
+}
+.col-role-name {
+  font-size: .78rem; font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.col-role-btns { display: flex; flex-wrap: wrap; gap: .3rem; }
+.col-role-btn {
+  font-size: .7rem;
+  padding: .2rem .5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all .15s;
+  white-space: nowrap;
+}
+.col-role-btn.active {
+  background: color-mix(in srgb, var(--role-color, var(--accent)) 15%, transparent);
+  border-color: var(--role-color, var(--accent));
+  color: var(--role-color, var(--accent));
+  font-weight: 700;
+}
+.col-role-btn:hover:not(.active) { border-color: var(--text-muted); color: var(--text-primary); }
+.col-role-actions { display: flex; gap: .5rem; }
+
+/* ── Suggestions scroll ────────────────────────────────── */
+.ai-chat-suggestions {
+  display: flex;
+  gap: .4rem;
+  flex-wrap: wrap;
+  padding: .4rem 0;
+}
+
+/* ── slideDown keyframe ────────────────────────────────── */
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

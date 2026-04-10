@@ -93,6 +93,10 @@ const Editor = (() => {
     populatePeriodColSelect();
     renderTable();
     GroupManager.refresh();
+    // Sütun rolleri otomatik algıla ve grid güncelle
+    if (typeof ColRoles !== 'undefined') {
+      ColRoles.autoDetect(headers, rows);
+    }
     App.toast(`${rows.length} satır, ${headers.length} sütun yüklendi`, 'success');
   }
 

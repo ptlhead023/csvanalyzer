@@ -47,6 +47,14 @@ const App = (() => {
     try {
       const groups  = GroupManager.getGroups();
       const options = getOptions();
+      // Sütun rolleri entegre et
+      const colRoles = typeof ColRoles !== 'undefined' ? ColRoles.getRoles() : {};
+      if (Object.keys(colRoles).length) {
+        const { periodCols, resultCols, ignoreCols } = ColRoles.getAnalysisColumns(Editor.getHeaders());
+        if (periodCols.length) options.period_col = periodCols[0];
+        if (ignoreCols.length) options.ignore_cols = ignoreCols;
+        if (resultCols.length) options.result_cols = resultCols;
+      }
       const data    = await Bridge.analyze(csv, groups, options);
       if (!data.success) throw new Error(data.error || 'Analiz başarısız');
       const result = data.result;
@@ -373,6 +381,7 @@ const App = (() => {
     TabManager.init();
     Editor.init();
     GroupManager.init();
+    ColRoles.init();
     Charts.initEvents();
     AIRender.initAIPanel();
     initEvents();
@@ -439,3 +448,112 @@ const TabManager = (() => {
 
 
 document.addEventListener('DOMContentLoaded', App.init);
+
+
+// ══════════════════════════════════════════════════════════
+//  ColRoles  —  Sütun rol yönetimi (dönem / veri / sonuç / yoksay)
+// ══════════════════════════════════════════════════════════
+const ColRoles = (() => {
+  // roles: { sütunAdı: 'period' | 'data' | 'result' | 'ignore' }
+  let _roles = {};
+
+  const ROLE_LABELS = {
+    period: { label: 'Dönem', icon: '🗓️', color: '#3b82f6', hint: 'Zaman ekseni (yıl, ay, tarih…)' },
+    data:   { label: 'Veri',  icon: '📊', color: '#8b5cf6', hint: 'Sayısal girdi verisi' },
+    result: { label: 'Sonuç', icon: '🎯', color: '#22c55e', hint: 'Hedef / çıktı değeri' },
+    ignore: { label: 'Yoksay', icon: '⊘', color: '#6b7280', hint: 'Analizde kullanma' }
+  };
+
+  function setRole(colName, role) { _roles[colName] = role; _renderRoleGrid(); }
+  function getRoles() { return { ..._roles }; }
+  function reset() { _roles = {}; _renderRoleGrid(); }
+
+  // Otomatik algılama — sayısal vs metin, yıl/tarih kalıpları
+  function autoDetect(headers, rows) {
+    _roles = {};
+    const sample = rows.slice(0, Math.min(rows.length, 10));
+    headers.forEach((h, idx) => {
+      const vals = sample.map(r => r[idx]).filter(v => v !== '' && v != null);
+      const hLower = h.toLowerCase();
+
+      // Dönem: yıl/tarih/ay/dönem içeren başlık veya sayısal aralık 1990-2100
+      const isPeriodName = /yıl|yil|year|date|tarih|ay|month|period|dönem|donem|quarter/i.test(hLower);
+      const isYearVal    = vals.length > 0 && vals.every(v => /^\d{4}$/.test(String(v).trim()) && parseInt(v) >= 1900 && parseInt(v) <= 2100);
+      if (isPeriodName || isYearVal) { _roles[h] = 'period'; return; }
+
+      // Yoksay: metin ağırlıklı
+      const numCount = vals.filter(v => !isNaN(parseFloat(String(v).replace(',', '.'))) && isFinite(v)).length;
+      if (vals.length > 0 && numCount / vals.length < 0.5) { _roles[h] = 'ignore'; return; }
+
+      // Son sütun genelde sonuç
+      if (idx === headers.length - 1 && numCount / (vals.length || 1) > 0.7) { _roles[h] = 'result'; return; }
+
+      _roles[h] = 'data';
+    });
+    _renderRoleGrid();
+  }
+
+  function _renderRoleGrid() {
+    const section = document.getElementById('col-role-section');
+    const grid    = document.getElementById('col-role-grid');
+    if (!section || !grid) return;
+
+    const headers = typeof Editor !== 'undefined' ? Editor.getHeaders() : [];
+    if (!headers.length) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+
+    grid.innerHTML = headers.map(h => {
+      const current = _roles[h] || 'data';
+      return `
+        <div class="col-role-card" data-col="${h}">
+          <div class="col-role-name" title="${h}">${h}</div>
+          <div class="col-role-btns">
+            ${Object.entries(ROLE_LABELS).map(([role, info]) => `
+              <button class="col-role-btn${current === role ? ' active' : ''}"
+                data-role="${role}" data-col="${h}"
+                title="${info.hint}"
+                style="${current === role ? `--role-color:${info.color}` : ''}">
+                ${info.icon} ${info.label}
+              </button>`).join('')}
+          </div>
+        </div>`;
+    }).join('');
+
+    grid.querySelectorAll('.col-role-btn').forEach(btn => {
+      btn.addEventListener('click', () => setRole(btn.dataset.col, btn.dataset.role));
+    });
+  }
+
+  function init() {
+    document.getElementById('btn-col-role-auto')?.addEventListener('click', () => {
+      const h = typeof Editor !== 'undefined' ? Editor.getHeaders() : [];
+      const r = typeof Editor !== 'undefined' ? Editor.getRows() : [];
+      autoDetect(h, r);
+      if (typeof App !== 'undefined') App.toast('Sütun rolleri otomatik algılandı', 'success');
+    });
+    document.getElementById('btn-col-role-reset')?.addEventListener('click', () => {
+      reset();
+      if (typeof App !== 'undefined') App.toast('Roller sıfırlandı', 'info');
+    });
+  }
+
+  // Analiz için sütun filtreleme
+  function getAnalysisColumns(headers) {
+    if (!Object.keys(_roles).length) return { periodCols: [], dataCols: headers, resultCols: [] };
+    const periodCols = headers.filter(h => _roles[h] === 'period');
+    const dataCols   = headers.filter(h => !_roles[h] || _roles[h] === 'data');
+    const resultCols = headers.filter(h => _roles[h] === 'result');
+    const ignoreCols = headers.filter(h => _roles[h] === 'ignore');
+    return { periodCols, dataCols, resultCols, ignoreCols };
+  }
+
+  // CSV context for AI — sadece aktif sütunlar
+  function getFilteredCSV(headers, rows) {
+    const { ignoreCols } = getAnalysisColumns(headers);
+    const activeHeaders  = headers.filter(h => !ignoreCols.includes(h));
+    const activeRows     = rows.map(r => headers.reduce((acc, h, i) => { if (!ignoreCols.includes(h)) acc.push(r[i]); return acc; }, []));
+    return { headers: activeHeaders, rows: activeRows };
+  }
+
+  return { setRole, getRoles, reset, autoDetect, init, getAnalysisColumns, getFilteredCSV, renderGrid: _renderRoleGrid };
+})();

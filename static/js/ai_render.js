@@ -46,6 +46,11 @@ SEN BİR KOORDİNATÖRSÜN: Kullanıcıya hangi analizi yapacağını, hangi sü
     } else if (err.type === 'all_quota') {
       _pendingContinuation = continuation || null;
       showQuotaModal(err.apis);
+    } else if (err.type === 'free_limit') {
+      AIManager.showFreeBanner(AIManager.getTodayCount(), 10);
+      App.toast("Günlük ücretsiz limit doldu. Pro'ya geçin veya yarın tekrar deneyin.", 'warning');
+    } else if (err.type === 'auth') {
+      App.toast('API anahtarı geçersiz: ' + (err.message || ''), 'error');
     } else {
       App.toast('AI Hatası: ' + (err.message || String(err)), 'error');
     }
@@ -354,43 +359,59 @@ SEN BİR KOORDİNATÖRSÜN: Kullanıcıya hangi analizi yapacağını, hangi sü
   }
 
   // ════════════════════════════════════════════════
-  //  AI CHAT PANEL (Gemini asistan)
+  //  AI CHAT PANEL v2 — CSV context, col roles, markdown
   // ════════════════════════════════════════════════
+
+  let _csvAttached  = false; // kullanıcı CSV'yi chat'e pinlediyse
+  let _contextShown = false; // ilk context mesajı gösterildi mi
+
   function _buildChatPanel() {
     const existing = document.getElementById('ai-chat-panel');
     if (existing) return;
     const panel = document.getElementById('ai-analysis-panel');
     if (!panel) return;
 
-    // Replace the old two-column input with chat panel
     panel.innerHTML = `
       <div class="ai-panel-header">
-        <h3><i data-lucide="brain"></i> AI Asistan</h3>
-        <span class="ai-panel-hint">Gemini ile veri üzerine sohbet et</span>
+        <h3><i data-lucide="brain"></i> AI Asistan — Lens</h3>
+        <div class="ai-panel-header-right">
+          <span class="ai-chat-model-badge" id="ai-chat-model-badge">—</span>
+          <button class="ai-header-btn" id="btn-chat-clear" title="Sohbeti Temizle"><i data-lucide="trash-2"></i></button>
+        </div>
       </div>
       <div class="ai-chat-panel" id="ai-chat-panel">
-        <div class="ai-chat-header">
-          <i data-lucide="bot"></i>
-          <span class="ai-chat-title">Lens</span>
-          <span class="ai-chat-model-badge" id="ai-chat-model-badge">—</span>
-        </div>
         <div class="ai-chat-messages" id="ai-chat-messages">
-          <div class="ai-msg">
+          <div class="ai-msg ai-msg-system">
             <div class="ai-msg-avatar">◈</div>
-            <div class="ai-msg-bubble">Merhaba! Ben Lens. CSV tablonuzu analiz etmeme yardımcı olabilirim. Ne yapmak istersiniz?</div>
+            <div class="ai-msg-bubble">
+              Merhaba! Ben <strong>Lens</strong>. Projeniz hakkında soru sorabilir, CSV tablonuzu buraya yapıştırabilir ya da analiz parametrelerinizi birlikte belirleyebiliriz.
+              <div class="ai-quick-actions">
+                <button class="ai-quick-btn" data-action="attach-csv">📎 CSV'yi Sohbete Ekle</button>
+                <button class="ai-quick-btn" data-action="col-roles">🎯 Sütun Rolleri Göster</button>
+                <button class="ai-quick-btn" data-action="summarize">📋 Tabloyu Özetle</button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="ai-chat-suggestions" id="ai-chat-suggestions">
-          <button class="ai-suggestion-chip" data-msg="Tablodaki trendleri analiz et">📈 Trendleri analiz et</button>
-          <button class="ai-suggestion-chip" data-msg="Sütunları mantıklı gruplara ayır">📂 Gruplar öner</button>
-          <button class="ai-suggestion-chip" data-msg="Tabloda anormal değerler var mı?">⚠ Anomali ara</button>
-          <button class="ai-suggestion-chip" data-msg="Hangi sütunlar arasında korelasyon var?">🔗 Korelasyon bul</button>
+          <button class="ai-suggestion-chip" data-msg="Tablodaki trendleri açıkla">📈 Trendler</button>
+          <button class="ai-suggestion-chip" data-msg="Sütunları mantıklı gruplara ayır ve JSON olarak ver">📂 Grupla</button>
+          <button class="ai-suggestion-chip" data-msg="Tabloda anormal veya beklenmedik değer var mı?">⚠ Anomali</button>
+          <button class="ai-suggestion-chip" data-msg="Hangi sütunlar arasında güçlü korelasyon var?">🔗 Korelasyon</button>
+          <button class="ai-suggestion-chip" data-msg="Hangi sütun dönem, hangisi veri, hangisi sonuç olmalı? Öner.">🎯 Rol Öner</button>
+          <button class="ai-suggestion-chip" data-msg="Bu tablo için en uygun analiz türü hangisi?">🧠 Analiz Öner</button>
+        </div>
+        <div class="ai-chat-attach-strip" id="ai-csv-attach-strip" style="display:none">
+          <span class="attach-badge"><i data-lucide="paperclip"></i> CSV tabloya eklendi</span>
+          <button class="attach-remove" id="btn-detach-csv">× Kaldır</button>
         </div>
         <div class="ai-chat-input-area">
-          <textarea class="ai-chat-input" id="ai-chat-input" placeholder="Tablonuz hakkında bir şey sorun..." rows="1"></textarea>
+          <button class="btn-chat-attach" id="btn-attach-csv" title="CSV'yi Sohbete Ekle"><i data-lucide="paperclip"></i></button>
+          <textarea class="ai-chat-input" id="ai-chat-input" placeholder="Soru sor, CSV yapıştır, yorum iste…" rows="1"></textarea>
           <button class="btn-chat-send" id="btn-chat-send"><i data-lucide="send"></i></button>
         </div>
       </div>`;
+
     lucide.createIcons();
     _initChatEvents();
   }
@@ -398,7 +419,7 @@ SEN BİR KOORDİNATÖRSÜN: Kullanıcıya hangi analizi yapacağını, hangi sü
   async function _updateModelBadge() {
     const badge = document.getElementById('ai-chat-model-badge');
     if (!badge) return;
-    const apis = await AIManager.getAPIs();
+    const apis   = await AIManager.getAPIs();
     const active = apis.find(a => !a.quotaExhausted);
     badge.textContent = active ? active.model : 'API yok';
   }
@@ -407,17 +428,45 @@ SEN BİR KOORDİNATÖRSÜN: Kullanıcıya hangi analizi yapacağını, hangi sü
     const input   = document.getElementById('ai-chat-input');
     const sendBtn = document.getElementById('btn-chat-send');
 
-    // Auto-resize textarea
     input?.addEventListener('input', () => {
       input.style.height = '38px';
-      input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+      input.style.height = Math.min(input.scrollHeight, 120) + 'px';
     });
-
-    input?.addEventListener('keydown', (e) => {
+    input?.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _sendChatMessage(); }
     });
-
     sendBtn?.addEventListener('click', _sendChatMessage);
+
+    // Clear chat
+    document.getElementById('btn-chat-clear')?.addEventListener('click', () => {
+      _chatHistory = [];
+      _csvAttached  = false;
+      _contextShown = false;
+      const msgs = document.getElementById('ai-chat-messages');
+      if (msgs) msgs.innerHTML = '<div class="ai-msg ai-msg-system"><div class="ai-msg-avatar">◈</div><div class="ai-msg-bubble">Sohbet temizlendi. Yeni bir konuya başlayabilirsiniz.</div></div>';
+      document.getElementById('ai-csv-attach-strip').style.display = 'none';
+      document.getElementById('ai-chat-suggestions').style.display = 'flex';
+      App.toast('Sohbet temizlendi', 'info');
+    });
+
+    // Attach / detach CSV
+    document.getElementById('btn-attach-csv')?.addEventListener('click', _attachCSV);
+    document.getElementById('btn-detach-csv')?.addEventListener('click', () => {
+      _csvAttached = false;
+      document.getElementById('ai-csv-attach-strip').style.display = 'none';
+      document.getElementById('btn-attach-csv').classList.remove('active');
+      App.toast('CSV sohbetten kaldırıldı', 'info');
+    });
+
+    // Quick action buttons
+    document.getElementById('ai-chat-messages')?.addEventListener('click', e => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      if (action === 'attach-csv') _attachCSV();
+      if (action === 'col-roles')  { document.getElementById('col-role-section')?.scrollIntoView({ behavior: 'smooth' }); }
+      if (action === 'summarize')  { if (input) input.value = 'Tablodaki veriyi kısaca özetle'; _sendChatMessage(); }
+    });
 
     // Suggestion chips
     document.querySelectorAll('.ai-suggestion-chip').forEach(chip => {
@@ -425,22 +474,47 @@ SEN BİR KOORDİNATÖRSÜN: Kullanıcıya hangi analizi yapacağını, hangi sü
         const msg = chip.dataset.msg;
         if (input) input.value = msg;
         _sendChatMessage();
-        // Hide suggestions after first use
-        const sug = document.getElementById('ai-chat-suggestions');
-        if (sug) sug.style.display = 'none';
+        document.getElementById('ai-chat-suggestions').style.display = 'none';
       });
     });
   }
 
-  function _appendMessage(role, text) {
+  function _attachCSV() {
+    const headers = typeof Editor !== 'undefined' ? Editor.getHeaders() : [];
+    if (!headers.length) { App.toast('Önce CSV yükleyin', 'warning'); return; }
+    _csvAttached = true;
+    document.getElementById('ai-csv-attach-strip').style.display = 'flex';
+    document.getElementById('btn-attach-csv').classList.add('active');
+    lucide?.createIcons?.();
+    App.toast('CSV sohbete eklendi — her mesajda tabloya erişebilirsiniz', 'success');
+  }
+
+  // Gelişmiş markdown render
+  function _renderMarkdown(text) {
+    return text
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/```([\s\S]*?)```/g, '<pre class="ai-code-block"><code>$1</code></pre>')
+      .replace(/`([^`]+)`/g, '<code class="ai-inline-code">$1</code>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/^#{3}\s(.+)$/gm, '<h4 class="ai-h4">$1</h4>')
+      .replace(/^#{2}\s(.+)$/gm, '<h3 class="ai-h3">$1</h3>')
+      .replace(/^#{1}\s(.+)$/gm, '<h2 class="ai-h2">$1</h2>')
+      .replace(/^[-*]\s(.+)$/gm, '<li>$1</li>')
+      .replace(/(<li>.*<\/li>)/gs, '<ul class="ai-list">$1</ul>')
+      .replace(/\n/g, '<br>').replace(/\n/g, '<br>');
+  }
+
+  function _appendMessage(role, text, opts = {}) {
     const container = document.getElementById('ai-chat-messages');
     if (!container) return;
     const div = document.createElement('div');
-    div.className = 'ai-msg' + (role === 'user' ? ' ai-msg-user' : '');
-    const initials = Auth.getUser()?.displayName?.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() || 'SN';
+    div.className = 'ai-msg' + (role === 'user' ? ' ai-msg-user' : '') + (opts.system ? ' ai-msg-system' : '');
+    const initials = Auth.getUser()?.displayName?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'SN';
+    const bubble   = role === 'user' ? text.replace(/\n/g, '<br>').replace(/\n/g, '<br>') : _renderMarkdown(text);
     div.innerHTML = `
       <div class="ai-msg-avatar">${role === 'user' ? initials : '◈'}</div>
-      <div class="ai-msg-bubble">${text.replace(/\n/g, '<br>')}</div>`;
+      <div class="ai-msg-bubble">${bubble}</div>`;
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
   }
@@ -454,16 +528,41 @@ SEN BİR KOORDİNATÖRSÜN: Kullanıcıya hangi analizi yapacağını, hangi sü
     div.innerHTML = `
       <div class="ai-msg-avatar">◈</div>
       <div class="ai-typing">
-        <div class="ai-typing-dot"></div>
-        <div class="ai-typing-dot"></div>
-        <div class="ai-typing-dot"></div>
+        <div class="ai-typing-dot"></div><div class="ai-typing-dot"></div><div class="ai-typing-dot"></div>
       </div>`;
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
   }
 
-  function _removeTyping() {
-    document.getElementById('ai-typing-indicator')?.remove();
+  function _removeTyping() { document.getElementById('ai-typing-indicator')?.remove(); }
+
+  function _buildContextBlock() {
+    const headers  = typeof Editor !== 'undefined' ? Editor.getHeaders() : [];
+    const rows     = typeof Editor !== 'undefined' ? Editor.getRows()    : [];
+    if (!headers.length) return '';
+
+    // Sütun rolleri
+    const roles    = typeof ColRoles !== 'undefined' ? ColRoles.getRoles() : {};
+    const roleStr  = Object.keys(roles).length
+      ? '\nSütun rolleri: ' + headers.map(h => `${h}(${roles[h] || 'data'})`).join(', ')
+      : '';
+
+    // Filtrelenmiş CSV
+    let csvCtx;
+    if (typeof ColRoles !== 'undefined' && Object.keys(roles).length) {
+      const { headers: ah, rows: ar } = ColRoles.getFilteredCSV(headers, rows);
+      csvCtx = buildDataSummary(ah, ar);
+    } else {
+      csvCtx = buildDataSummary(headers, rows);
+    }
+
+    // Analiz sonucu varsa kısa özet ekle
+    const result = typeof Charts !== 'undefined' ? Charts.getResult?.() : null;
+    const resultStr = result
+      ? '\nSon analiz özeti: ' + JSON.stringify(result).slice(0, 800)
+      : '';
+
+    return `[PROJE BAĞLAMI]${roleStr}\n${csvCtx}${resultStr}\n[/PROJE BAĞLAMI]`;
   }
 
   async function _sendChatMessage() {
@@ -478,17 +577,21 @@ SEN BİR KOORDİNATÖRSÜN: Kullanıcıya hangi analizi yapacağını, hangi sü
     input.value = '';
     input.style.height = '38px';
 
-    // Add table context to first message
+    // Context injection strategy
     let userContent = text;
     const headers = typeof Editor !== 'undefined' ? Editor.getHeaders() : [];
-    const rows    = typeof Editor !== 'undefined' ? Editor.getRows() : [];
-    if (_chatHistory.length === 0 && headers.length) {
-      userContent = `Tablo bağlamı:\n${buildDataSummary(headers, rows)}\n\nKullanıcı: ${text}`;
+
+    // İlk mesajda veya CSV pinliyse context ekle
+    const shouldInject = (_chatHistory.length === 0 && headers.length) || (_csvAttached && headers.length);
+    if (shouldInject) {
+      const ctx = _buildContextBlock();
+      if (ctx) userContent = ctx + '\n\nKullanıcı sorusu: ' + text;
     }
 
     _chatHistory.push({ role: 'user', content: userContent });
     _appendMessage('user', text);
-    document.getElementById('btn-chat-send').disabled = true;
+    const sendBtn = document.getElementById('btn-chat-send');
+    if (sendBtn) sendBtn.disabled = true;
     _appendTyping();
 
     const doCall = async () => {
@@ -499,12 +602,17 @@ SEN BİR KOORDİNATÖRSÜN: Kullanıcıya hangi analizi yapacağını, hangi sü
         _chatHistory.push({ role: 'assistant', content: reply });
         _appendMessage('assistant', reply);
         _updateModelBadge();
+        // Suggestions gizle
+        document.getElementById('ai-chat-suggestions').style.display = 'none';
       } catch (err) {
         _removeTyping();
-        handleAIError(err, doCall);
+        if (err.type === 'free_limit') {
+          _appendMessage('assistant', `🚫 **Günlük ücretsiz limit doldu.**\n\nYarın yenilenir veya Ayarlar → Paket bölümünden Pro'ya geçebilirsiniz.`, { system: true });
+        } else {
+          handleAIError(err, doCall);
+        }
       } finally {
-        const btn = document.getElementById('btn-chat-send');
-        if (btn) btn.disabled = false;
+        if (sendBtn) sendBtn.disabled = false;
       }
     };
 

@@ -193,31 +193,24 @@
           </div>
         </div>
 
+        <!-- Sütun Rol Seçici -->
+        <div class="col-role-section" id="col-role-section" style="display:none">
+          <div class="col-role-header">
+            <h3><i data-lucide="table-properties"></i> Sütun Rolleri</h3>
+            <span class="col-role-hint">Her sütunun rolünü belirleyin: Dönem mi? Veri mi? Sonuç mu?</span>
+          </div>
+          <div class="col-role-grid" id="col-role-grid"></div>
+          <div class="col-role-actions">
+            <button class="btn-xs" id="btn-col-role-auto"><i data-lucide="wand-2"></i> Otomatik Algıla</button>
+            <button class="btn-xs" id="btn-col-role-reset">Sıfırla</button>
+          </div>
+        </div>
+
         <!-- AI Analiz Paneli -->
-        <div class="ai-analysis-panel">
+        <div class="ai-analysis-panel" id="ai-analysis-panel">
           <div class="ai-panel-header">
             <h3><i data-lucide="brain"></i> AI Asistan</h3>
-            <span class="ai-panel-hint">Tablonuzu yorumlatın, araştırma yapın</span>
-          </div>
-
-          <div class="ai-panel-row">
-            <div class="ai-panel-block">
-              <label>Tabloya Soru Sor</label>
-              <div class="ai-input-row">
-                <input type="text" id="ai-custom-prompt" placeholder="Örn: Hangi konular tutarsız değişiyor?" />
-                <button class="btn-primary btn-sm" id="btn-ai-analyze-custom"><i data-lucide="send"></i></button>
-              </div>
-              <div class="ai-custom-output" id="ai-custom-output" style="display:none"></div>
-            </div>
-
-            <div class="ai-panel-block">
-              <label>Piyasa / Risk Araştırması</label>
-              <div class="ai-input-row">
-                <input type="text" id="ai-research-topic" placeholder="Örn: TYT 2026 sınav reformu beklentisi" />
-                <button class="btn-primary btn-sm" id="btn-ai-research"><i data-lucide="globe"></i></button>
-              </div>
-              <div id="research-panel" style="display:none"></div>
-            </div>
+            <span class="ai-panel-hint">Proje hakkında soru sor, CSV gir, analiz yaptır</span>
           </div>
         </div>
 
