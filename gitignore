@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
+venv/
+env/
+.venv/
+.env/
+ENV/
+
+# Environment variables
+.env
+
+# Flask
+instance/
+.webassets-cache
+flask_session/
+
+# Output files (geçici analiz sonuçları)
+static/output/*.json
+static/output/*.csv
+static/output/*.xlsx
+!static/output/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.user
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Firebase Admin SDK key (eğer kullanılırsa)
+firebase.json
+firebase-adminsdk*.json
+serviceAccountKey.json
+
+# Render / deployment
+.render/

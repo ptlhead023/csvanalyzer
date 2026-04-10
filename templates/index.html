@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="obsidian">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DataLens</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    const firebaseConfig = {
+      apiKey: "AIzaSyA55BabUj8ib6sF47M7eYjd0pngou6nsls",
+      authDomain: "tabloanalizbeta.firebaseapp.com",
+      databaseURL: "https://tabloanalizbeta-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "tabloanalizbeta",
+      storageBucket: "tabloanalizbeta.firebasestorage.app",
+      messagingSenderId: "806665132343",
+      appId: "1:806665132343:web:1c5167712e8ab7b40be2b2"
+    };
+    const fbApp = initializeApp(firebaseConfig);
+    const db = getFirestore(fbApp);
+    window.__db = db;
+    window.__fbReady = true;
+    document.dispatchEvent(new Event("firebase-ready"));
+  </script>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+
+<body data-theme="obsidian">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <span class="logo-icon">◈</span>
+      <span class="logo-text">DataLens</span>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-tab="projects"><i data-lucide="folder-open"></i><span>Projeler</span></button>
+      <button class="nav-item" data-tab="new-analysis"><i data-lucide="plus-circle"></i><span>Yeni Analiz</span></button>
+      <button class="nav-item" data-tab="results"><i data-lucide="bar-chart-2"></i><span>Sonuçlar</span><span class="nav-badge" id="results-badge" style="display:none">!</span></button>
+      <button class="nav-item" data-tab="settings"><i data-lucide="settings-2"></i><span>Ayarlar</span></button>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="server-status" id="server-status">
+        <span class="status-dot" id="status-dot"></span>
+        <span class="status-label" id="status-label">Bağlanıyor...</span>
+      </div>
+      <div class="firebase-status" id="firebase-status">
+        <i data-lucide="cloud"></i>
+        <span id="firebase-label">Firebase</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content" id="main-content">
+
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <h1 class="page-title" id="page-title">Projeler</h1>
+        <p class="page-subtitle" id="page-subtitle">Kayıtlı analizleriniz</p>
+      </div>
+      <div class="top-bar-right">
+        <div class="history-controls" id="history-controls" style="display:none">
+          <button class="icon-btn" id="btn-undo" title="Geri Al (Ctrl+Z)" disabled><i data-lucide="undo-2"></i></button>
+          <button class="icon-btn" id="btn-redo" title="İleri Al (Ctrl+Y)" disabled><i data-lucide="redo-2"></i></button>
+          <button class="icon-btn danger" id="btn-reset" title="Sıfırla" disabled><i data-lucide="rotate-ccw"></i></button>
+          <div class="history-counter" id="history-counter">0 / 0</div>
+        </div>
+        <button class="btn-secondary" id="btn-save-project" style="display:none"><i data-lucide="save"></i> Kaydet</button>
+        <button class="btn-primary" id="btn-run-analysis" style="display:none"><i data-lucide="zap"></i> Analiz Et</button>
+        <div class="theme-picker" id="theme-picker">
+          <button class="theme-btn active" data-theme="obsidian" title="Obsidian">◈</button>
+          <button class="theme-btn" data-theme="ocean" title="Ocean">◉</button>
+          <button class="theme-btn" data-theme="ember" title="Ember">◆</button>
+          <button class="theme-btn" data-theme="forest" title="Forest">◇</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ══ PROJELER ══ -->
+    <section class="tab-panel active" id="tab-projects">
+      <div class="projects-toolbar">
+        <div class="search-box">
+          <i data-lucide="search"></i>
+          <input type="text" placeholder="Proje ara..." id="search-projects" />
+        </div>
+        <button class="btn-primary" id="btn-new-project-quick"><i data-lucide="plus"></i> Yeni Proje</button>
+      </div>
+      <div class="projects-grid" id="projects-grid">
+        <div class="projects-empty" id="projects-empty">
+          <div class="empty-icon">◈</div>
+          <h3>Henüz proje yok</h3>
+          <p>CSV verilerinizi yükleyerek ilk analizinizi başlatın</p>
+          <button class="btn-primary" onclick="TabManager.switchTo('new-analysis')"><i data-lucide="plus-circle"></i> İlk Projeyi Oluştur</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ YENİ ANALİZ ══ -->
+    <section class="tab-panel" id="tab-new-analysis">
+
+      <div class="project-name-row">
+        <div class="input-field-fancy">
+          <i data-lucide="tag"></i>
+          <input type="text" id="project-name-input" placeholder="Proje adı girin..." maxlength="80" />
+        </div>
+        <div class="input-field-fancy short">
+          <i data-lucide="align-left"></i>
+          <input type="text" id="project-notes-input" placeholder="Kısa not (opsiyonel)..." maxlength="200" />
+        </div>
+      </div>
+
+      <div class="csv-upload-area" id="csv-upload-area">
+        <div class="upload-zone" id="upload-zone">
+          <div class="upload-icon-wrap"><i data-lucide="file-text"></i></div>
+          <h3>CSV Dosyasını Sürükle & Bırak</h3>
+          <p>veya</p>
+          <div class="upload-actions">
+            <label class="btn-secondary" for="file-input"><i data-lucide="upload"></i> Dosya Seç</label>
+            <button class="btn-secondary" id="btn-paste-csv"><i data-lucide="clipboard"></i> Yapıştır</button>
+          </div>
+          <input type="file" id="file-input" accept=".csv,.tsv,.txt" style="display:none" />
+          <p class="upload-hint">CSV, TSV • Virgül, noktalı virgül veya tab ayraç</p>
+        </div>
+        <div class="paste-modal" id="paste-modal" style="display:none">
+          <div class="paste-modal-inner">
+            <div class="paste-modal-header">
+              <h3><i data-lucide="clipboard"></i> CSV Yapıştır</h3>
+              <button class="icon-btn" id="btn-close-paste"><i data-lucide="x"></i></button>
+            </div>
+            <textarea id="paste-textarea" placeholder="CSV verinizi buraya yapıştırın...&#10;&#10;Örnek:&#10;Yıl,Matematik,Türkçe&#10;2019,40,35&#10;2020,38,37"></textarea>
+            <div class="paste-modal-footer">
+              <button class="btn-secondary" id="btn-close-paste-2">İptal</button>
+              <button class="btn-primary" id="btn-confirm-paste"><i data-lucide="check"></i> Yükle</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Editör Alanı -->
+      <div class="editor-area" id="editor-area" style="display:none">
+        <div class="editor-toolbar">
+          <div class="editor-toolbar-left">
+            <button class="btn-xs" id="btn-add-row"><i data-lucide="plus"></i> Satır</button>
+            <button class="btn-xs" id="btn-add-col"><i data-lucide="plus"></i> Sütun</button>
+            <button class="btn-xs danger" id="btn-del-row"><i data-lucide="minus"></i> Satır Sil</button>
+            <button class="btn-xs danger" id="btn-del-col"><i data-lucide="minus"></i> Sütun Sil</button>
+            <div class="divider-v"></div>
+            <button class="btn-xs" id="btn-export-csv"><i data-lucide="download"></i> CSV İndir</button>
+          </div>
+          <div class="editor-toolbar-right">
+            <span class="table-info" id="table-info">0 × 0</span>
+          </div>
+        </div>
+        <div class="table-scroll-wrap">
+          <table class="data-table" id="data-table">
+            <thead id="table-head"></thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+
+        <!-- AI + Gruplar Paneli -->
+        <div class="ai-groups-panel">
+          <div class="ai-groups-header">
+            <h3><i data-lucide="layers"></i> Gruplar</h3>
+            <div class="ai-groups-actions">
+              <button class="btn-secondary ai-btn" id="btn-ai-suggest-groups">
+                <i data-lucide="sparkles"></i> AI ile Grupla
+              </button>
+              <button class="btn-secondary" id="btn-add-group">
+                <i data-lucide="plus"></i> Manuel Grup
+              </button>
+            </div>
+          </div>
+          <div class="groups-list" id="groups-list">
+            <div class="groups-empty-msg" id="groups-empty-msg">
+              Gruplar oluşturun ya da <strong>AI ile Grupla</strong> butonuna tıklayın — AI sütunlarınızı otomatik analiz eder.
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Analiz Paneli -->
+        <div class="ai-analysis-panel">
+          <div class="ai-panel-header">
+            <h3><i data-lucide="brain"></i> AI Asistan</h3>
+            <span class="ai-panel-hint">Tablonuzu yorumlatın, araştırma yapın</span>
+          </div>
+
+          <div class="ai-panel-row">
+            <div class="ai-panel-block">
+              <label>Tabloya Soru Sor</label>
+              <div class="ai-input-row">
+                <input type="text" id="ai-custom-prompt" placeholder="Örn: Hangi konular tutarsız değişiyor?" />
+                <button class="btn-primary btn-sm" id="btn-ai-analyze-custom"><i data-lucide="send"></i></button>
+              </div>
+              <div class="ai-custom-output" id="ai-custom-output" style="display:none"></div>
+            </div>
+
+            <div class="ai-panel-block">
+              <label>Piyasa / Risk Araştırması</label>
+              <div class="ai-input-row">
+                <input type="text" id="ai-research-topic" placeholder="Örn: TYT 2026 sınav reformu beklentisi" />
+                <button class="btn-primary btn-sm" id="btn-ai-research"><i data-lucide="globe"></i></button>
+              </div>
+              <div id="research-panel" style="display:none"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Analiz Seçenekleri - Sadeleştirilmiş -->
+        <div class="analysis-options-section">
+          <div class="analysis-options-simple">
+            <div class="simple-opt">
+              <label>İleri tahmin dönemi</label>
+              <div class="forecast-stepper">
+                <button class="step-btn" onclick="const i=document.getElementById('opt-forecast-periods');i.value=Math.max(1,parseInt(i.value)-1)">−</button>
+                <input type="number" id="opt-forecast-periods" value="3" min="1" max="20" readonly />
+                <button class="step-btn" onclick="const i=document.getElementById('opt-forecast-periods');i.value=Math.min(20,parseInt(i.value)+1)">+</button>
+                <span class="step-label">dönem</span>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn-text" id="btn-toggle-advanced">
+            <i data-lucide="settings-2"></i> Gelişmiş Seçenekler
+          </button>
+
+          <div id="advanced-options" style="display:none">
+            <div class="options-grid">
+              <div class="option-card">
+                <label class="option-label">Tahmin Parametreleri</label>
+                <div class="param-row">
+                  <span>Güven aralığı</span>
+                  <select id="opt-confidence" class="param-select">
+                    <option value="80">%80</option>
+                    <option value="90">%90</option>
+                    <option value="95" selected>%95</option>
+                    <option value="99">%99</option>
+                  </select>
+                </div>
+                <div class="param-row">
+                  <span>Sayı formatı</span>
+                  <select id="opt-number-format" class="param-select">
+                    <option value="float">Ondalık</option>
+                    <option value="int">Tam sayı</option>
+                  </select>
+                </div>
+                <div class="param-row">
+                  <span>Dönem sütunu</span>
+                  <select id="opt-period-col" class="param-select">
+                    <option value="auto">Otomatik tespit</option>
+                  </select>
+                </div>
+              </div>
+              <div class="option-card">
+                <label class="option-label">Veri Aralığı</label>
+                <div class="param-row">
+                  <span>Başlangıç satırı</span>
+                  <input type="number" id="opt-row-start" value="1" min="1" class="param-input" />
+                </div>
+                <div class="param-row">
+                  <span>Bitiş satırı</span>
+                  <input type="number" id="opt-row-end" value="" placeholder="Son" class="param-input" />
+                </div>
+                <div class="param-row">
+                  <span>Hareketli ort. pencere</span>
+                  <input type="number" id="opt-ma-window" value="3" min="2" max="10" class="param-input" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ SONUÇLAR ══ -->
+    <section class="tab-panel" id="tab-results">
+      <div class="results-empty" id="results-empty">
+        <div class="empty-icon">◉</div>
+        <h3>Henüz analiz yok</h3>
+        <p>Yeni Analiz sekmesinden CSV yükleyin ve "Analiz Et" butonuna tıklayın</p>
+      </div>
+
+      <div class="results-content" id="results-content" style="display:none">
+
+        <!-- AI Yorum Paneli -->
+        <div class="ai-interpretation-panel" id="ai-interpretation-panel" style="display:none"></div>
+
+        <div class="results-header-row">
+          <div></div>
+          <div class="results-header-actions">
+            <button class="btn-secondary btn-sm" id="btn-ai-interpret-results">
+              <i data-lucide="sparkles"></i> AI Yorumla
+            </button>
+            <button class="btn-secondary btn-sm" id="btn-export-json">
+              <i data-lucide="download"></i> JSON
+            </button>
+            <button class="btn-secondary btn-sm" id="btn-export-excel">
+              <i data-lucide="table-2"></i> Excel
+            </button>
+          </div>
+        </div>
+
+        <div class="summary-cards" id="summary-cards"></div>
+
+        <div class="chart-tabs">
+          <button class="chart-tab active" data-chart="trend">Trend</button>
+          <button class="chart-tab" data-chart="forecast">Tahmin</button>
+          <button class="chart-tab" data-chart="correlation">Korelasyon</button>
+          <button class="chart-tab" data-chart="distribution">Dağılım</button>
+          <button class="chart-tab" data-chart="anomaly">Anomali</button>
+          <button class="chart-tab" data-chart="bayesian">Bayes</button>
+        </div>
+
+        <div class="chart-area">
+          <div class="chart-controls">
+            <div class="chart-controls-left" id="chart-col-selector"></div>
+            <div class="chart-controls-right">
+              <button class="icon-btn" id="btn-download-chart" title="PNG İndir"><i data-lucide="image-down"></i></button>
+              <button class="icon-btn" id="btn-toggle-fullscreen" title="Tam Ekran"><i data-lucide="maximize-2"></i></button>
+            </div>
+          </div>
+          <div class="chart-container"><canvas id="main-chart"></canvas></div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-header">
+            <h3 id="detail-title">Detay</h3>
+            <div class="detail-controls">
+              <input type="text" placeholder="Filtrele..." id="detail-filter" class="detail-filter-input" />
+            </div>
+          </div>
+          <div class="detail-table-wrap" id="detail-table-wrap"></div>
+        </div>
+
+        <div class="notes-section">
+          <h3><i data-lucide="notebook-pen"></i> Çalışma Notları</h3>
+          <textarea id="analysis-notes" placeholder="Bu analiz hakkında notlarınızı buraya ekleyin..."></textarea>
+          <button class="btn-secondary btn-sm" id="btn-save-notes"><i data-lucide="save"></i> Notu Kaydet</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ AYARLAR ══ -->
+    <section class="tab-panel" id="tab-settings">
+      <div class="settings-grid">
+
+        <!-- AI API Yönetimi -->
+        <div class="settings-card settings-card-wide" id="api-section">
+          <h3><i data-lucide="bot"></i> AI API Bağlantıları</h3>
+          <p class="settings-hint">Birden çok API ekleyebilirsiniz. Kota dolunca otomatik diğerine geçilir. İstekler sırayla dağıtılır.</p>
+
+          <div id="api-manager-container" class="api-manager-container"></div>
+
+          <div class="api-manager-footer">
+            <button class="btn-secondary" id="btn-open-add-api"><i data-lucide="plus"></i> Yeni API Ekle</button>
+            <button class="btn-text" id="btn-reset-all-quotas"><i data-lucide="refresh-cw"></i> Tüm Kotaları Sıfırla</button>
+          </div>
+
+          <div id="add-api-form" style="display:none" class="add-api-form">
+            <div class="form-row">
+              <label>API Sağlayıcı</label>
+              <select id="new-api-provider" class="param-select">
+                <option value="gemini">Google Gemini</option>
+                <option value="openai">OpenAI</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label>Model Seç</label>
+              <select id="new-api-model" class="param-select"></select>
+            </div>
+            <div class="form-row">
+              <label>API Anahtarı</label>
+              <input type="password" id="new-api-key" placeholder="API anahtarını girin..." />
+            </div>
+            <div class="form-row">
+              <label>İsim (opsiyonel)</label>
+              <input type="text" id="new-api-name" placeholder="Örn: Kişisel Gemini" />
+            </div>
+            <div class="add-api-actions">
+              <button class="btn-secondary" id="btn-test-add-api"><i data-lucide="plug"></i> Test Et</button>
+              <button class="btn-primary" id="btn-save-add-api"><i data-lucide="save"></i> Kaydet</button>
+            </div>
+            <div id="add-api-status" class="api-status"></div>
+          </div>
+        </div>
+
+        <!-- Tema -->
+        <div class="settings-card">
+          <h3><i data-lucide="palette"></i> Tema</h3>
+          <div class="theme-selector-big">
+            <div class="theme-option active" data-theme="obsidian"><div class="theme-preview obsidian-preview"></div><span>Obsidian</span><small>Siyah + Mor</small></div>
+            <div class="theme-option" data-theme="ocean"><div class="theme-preview ocean-preview"></div><span>Ocean</span><small>Lacivert + Cyan</small></div>
+            <div class="theme-option" data-theme="ember"><div class="theme-preview ember-preview"></div><span>Ember</span><small>Antrasit + Turuncu</small></div>
+            <div class="theme-option" data-theme="forest"><div class="theme-preview forest-preview"></div><span>Forest</span><small>Koyu + Lime</small></div>
+          </div>
+        </div>
+
+        <!-- Firebase -->
+        <div class="settings-card">
+          <h3><i data-lucide="cloud"></i> Firebase</h3>
+          <div class="firebase-info">
+            <div class="info-row"><span>Proje</span><code>tabloanalizbeta</code></div>
+            <div class="info-row"><span>Bölge</span><code>europe-west1</code></div>
+            <div class="info-row"><span>Durum</span><span class="status-badge" id="fb-status-badge">Kontrol ediliyor...</span></div>
+          </div>
+          <button class="btn-secondary" id="btn-test-firebase"><i data-lucide="plug"></i> Bağlantıyı Test Et</button>
+        </div>
+
+        <!-- Sunucu -->
+        <div class="settings-card">
+          <h3><i data-lucide="server"></i> Sunucu</h3>
+          <div class="firebase-info">
+            <div class="info-row"><span>Adres</span><code id="server-url">localhost:5000</code></div>
+            <div class="info-row"><span>Durum</span><span class="status-badge" id="server-status-badge">Kontrol ediliyor...</span></div>
+          </div>
+          <button class="btn-secondary" id="btn-test-server"><i data-lucide="activity"></i> Sunucuyu Test Et</button>
+        </div>
+
+        <!-- Veri Yönetimi -->
+        <div class="settings-card">
+          <h3><i data-lucide="trash-2"></i> Veri Yönetimi</h3>
+          <div class="danger-zone">
+            <button class="btn-danger" id="btn-clear-local"><i data-lucide="hard-drive"></i> Yerel Verileri Temizle</button>
+            <p class="danger-hint">API anahtarları ve tema dahil. Firebase verileri silinmez.</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loading-overlay" style="display:none">
+    <div class="loading-inner">
+      <div class="loading-spinner"></div>
+      <p id="loading-text">İşleniyor...</p>
+    </div>
+  </div>
+
+  <!-- Grup Modal (mevcut haliyle korundu) -->
+  <div class="modal-overlay" id="group-modal-overlay" style="display:none">
+    <div class="modal" id="group-modal">
+      <div class="modal-header">
+        <h3 id="group-modal-title">Yeni Grup</h3>
+        <button class="icon-btn" id="btn-close-group-modal"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <label>Grup Adı</label>
+          <input type="text" id="group-name-input" placeholder="Örn: Sayısal Dersler" />
+        </div>
+        <div class="form-row">
+          <label>Renk</label>
+          <div class="color-options" id="color-options">
+            <div class="color-swatch selected" data-color="#8b5cf6" style="background:#8b5cf6"></div>
+            <div class="color-swatch" data-color="#06b6d4" style="background:#06b6d4"></div>
+            <div class="color-swatch" data-color="#f97316" style="background:#f97316"></div>
+            <div class="color-swatch" data-color="#84cc16" style="background:#84cc16"></div>
+            <div class="color-swatch" data-color="#ec4899" style="background:#ec4899"></div>
+            <div class="color-swatch" data-color="#f59e0b" style="background:#f59e0b"></div>
+            <div class="color-swatch" data-color="#10b981" style="background:#10b981"></div>
+            <div class="color-swatch" data-color="#ef4444" style="background:#ef4444"></div>
+            <input type="color" id="group-color-custom" value="#8b5cf6" title="Özel renk" />
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Sütunlar</label>
+          <div class="column-checkboxes" id="column-checkboxes"></div>
+        </div>
+        <div class="form-row">
+          <label>Min/Max Aralık</label>
+          <div class="range-row">
+            <div class="range-toggle">
+              <button class="range-mode-btn active" id="range-auto-btn">Otomatik</button>
+              <button class="range-mode-btn" id="range-manual-btn">Manuel</button>
+            </div>
+          </div>
+          <div class="range-inputs" id="range-inputs" style="display:none">
+            <div class="range-pair">
+              <input type="number" id="group-min" placeholder="Min" step="any" />
+              <span>—</span>
+              <input type="number" id="group-max" placeholder="Max" step="any" />
+            </div>
+          </div>
+          <p class="range-hint" id="range-hint">Geçmiş verilerden otomatik hesaplanır</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btn-cancel-group">İptal</button>
+        <button class="btn-primary" id="btn-save-group"><i data-lucide="check"></i> Grubu Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Grup Önerileri Modal -->
+  <div class="modal-overlay" id="ai-suggestions-modal" style="display:none">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h3><i data-lucide="sparkles"></i> AI Grup Önerileri</h3>
+        <button class="icon-btn" id="btn-close-ai-suggestions"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body" id="ai-suggestions-body"></div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btn-close-ai-suggestions-2" onclick="document.getElementById('ai-suggestions-modal').style.display='none'">İptal</button>
+        <button class="btn-primary" id="btn-apply-suggestions"><i data-lucide="check"></i> Seçilenleri Ekle</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- API Kurulum Modal (API yokken) -->
+  <div class="modal-overlay" id="api-setup-modal" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i data-lucide="bot"></i> AI için API Gerekli</h3>
+        <button class="icon-btn" id="btn-close-api-setup"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">AI özelliklerini kullanmak için en az bir API anahtarı ekleyin. Gemini ücretsiz model önerilir.</p>
+        <div class="form-row">
+          <label>API Sağlayıcı</label>
+          <select id="new-api-provider" class="param-select" disabled>
+            <option value="gemini">Google Gemini</option>
+            <option value="openai">OpenAI</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Model</label>
+          <select id="new-api-model" class="param-select" disabled>
+            <option value="gemini-2.0-flash">Gemini 2.0 Flash ★ Ücretsiz</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>API Anahtarı</label>
+          <input type="password" id="new-api-key" placeholder="Gemini API anahtarını girin..." />
+        </div>
+        <div class="form-row">
+          <label>İsim</label>
+          <input type="text" id="new-api-name" placeholder="Örn: Kişisel Gemini" />
+        </div>
+        <div id="add-api-status" class="api-status"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btn-close-api-setup">Şimdi Değil</button>
+        <button class="btn-secondary" id="btn-test-add-api"><i data-lucide="plug"></i> Test Et</button>
+        <button class="btn-primary" id="btn-save-add-api"><i data-lucide="save"></i> Kaydet ve Devam Et</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Kota Doldu Modal -->
+  <div class="modal-overlay" id="quota-exhausted-modal" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i data-lucide="alert-triangle"></i> Tüm API Kotaları Doldu</h3>
+        <button class="icon-btn" id="btn-close-quota-modal"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">Tüm API'lerinizin kotası doldu. Yeni API ekleyebilir veya mevcut kotaları sıfırlayabilirsiniz.</p>
+        <div id="quota-api-list"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="TabManager.switchTo('settings');document.getElementById('quota-exhausted-modal').style.display='none'">Ayarlara Git</button>
+        <button class="btn-primary" onclick="AIManager.resetAllQuotas();AIRender.closeQuotaModal();App.toast('Kotalar sıfırlandı','success')">Tümünü Sıfırla</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/static/js/firebase.js"></script>
+  <script src="/static/js/bridge.js"></script>
+  <script src="/static/js/editor.js"></script>
+  <script src="/static/js/charts.js"></script>
+  <script src="/static/js/ai_manager.js"></script>
+  <script src="/static/js/ai_render.js"></script>
+  <script src="/static/js/app.js"></script>
+
+</body>
+</html>

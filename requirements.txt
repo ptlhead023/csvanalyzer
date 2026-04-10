@@ -1,0 +1,12 @@
+flask
+flask-cors
+pandas
+numpy
+scipy
+statsmodels
+scikit-learn
+ruptures
+openpyxl
+chardet
+python-dotenv
+gunicorn
